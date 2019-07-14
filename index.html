@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Single layer | CARTO</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,600,700|Open+Sans:300,400,600" rel="stylesheet">
+    <!-- Include Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.3.1/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet@1.3.1/dist/leaflet.css" rel="stylesheet">
+    <!-- Include CARTO.js -->
+    <script src="https://libs.cartocdn.com/carto.js/v4.1.11/carto.min.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:600" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+    <link rel="stylesheet" href="http://libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css" />
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body>
+    <div id="main">
+        <div id="map">
+        </div>
+        <!-- Description -->
+        <div id="toolbox" class="toolbox">
+            <div class="box">
+                <header>
+                <h1>Select dimension</h1>
+                </header>
+                <section>
+                <p class="description open-sans"></p>
+                </section>
+
+                <div id="controls">
+                    <ul id="options">
+                    </ul>
+                </div>
+
+                <footer class="js-footer"></footer>
+            </div>
+
+            <div id="legendbox" class="box cartodb-legend choropleth" style="display: none;">
+                <header>
+                <h1>Selected dimension</h1>
+                </header>
+                <ul style="width: 100%; height: auto">
+                    <li class="min"> 170000 </li>
+                    <li class="max"> 250000000 </li>
+                    <li class="graph count_315">
+                        <div class="colors">
+                            <div class="quartile" style="background-color:#FFFFB2"></div>
+                            <div class="quartile" style="background-color:#FECC5C"></div>
+                            <div class="quartile" style="background-color:#FD8D3C"></div>
+                            <div class="quartile" style="background-color:#F03B20"></div>
+                            <div class="quartile" style="background-color:#BD0026"></div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const map = L.map('map').setView([30, 0], 3);
+      map.scrollWheelZoom.disable();
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+        maxZoom: 18
+      }).addTo(map);
+
+      const apiKey = 'default_public';
+      const username = 'pmandiola'
+
+      const client = new carto.Client({ apiKey, username });
+
+      const source = new carto.source.Dataset('intersections_final');
+      const style = new carto.style.CartoCSS(`
+        #layer {
+          marker-width: 7;
+          marker-fill: #EE4D5A;
+          marker-line-color: #FFFFFF;
+        }
+      `);
+      
+      const layer = new carto.layer.Layer(source, style);
+
+      client.addLayer(layer);
+      client.getLeafletLayer().addTo(map);
+      
+      /*
+      * Zoom to Layer
+      * https://gist.github.com/ivanmalagon/4c6607df493cca652624e094568593ec 
+      */
+      const query = `SELECT ST_Extent(the_geom) as extent FROM intersections_final`;
+      const boundsUrl = `https://${username}.carto.com/api/v2/sql?q=${query}&api_key=${apiKey}`
+      fetch(boundsUrl)
+        .then(response => {
+          return response.json()
+        })
+        .then(json => {
+          const extent = json.rows[0].extent;
+          const bounds = parseExtent(extent);
+
+          map.fitBounds(
+            [
+              [bounds.south, bounds.west],
+              [bounds.north, bounds.east]
+            ]
+          );
+          
+          //Also move
+          var centerPoint = map.getSize().divideBy(2),
+          targetPoint = centerPoint.subtract([-150, 0]),
+          targetLatLng = map.containerPointToLatLng(targetPoint);
+            console.log(centerPoint)
+            console.log(targetLatLng)
+          map.panTo(targetLatLng, {animate: false});
+        });
+      // From BOX(-179.5 -89.9,179.3 82.3) to bounds object
+      function parseExtent (extent) {
+        const floatRegex = /-?[0-9]\d*(\.\d+)?/g;
+        const matches = extent.match(floatRegex);
+        return {
+          west: Number.parseFloat(matches[0]),
+          south: Number.parseFloat(matches[1]),
+          east: Number.parseFloat(matches[2]),
+          north: Number.parseFloat(matches[3])
+        };
+      }
+
+      options = [
+          { name: 'Form', dim: 'form3'},
+          { name: 'Density', dim: 'dens2'},
+          { name: 'Connectivity', dim: 'conn5'},
+          { name: 'Parks', dim: 'parks2'},
+          { name: 'Recreation', dim: 'paf2'},
+          { name: 'Pedestrian', dim: 'peds3'},
+          { name: 'Traffic', dim: 'traffic5'},
+          { name: 'Aesthetic', dim: 'aesttot3'},
+          { name: 'Safety', dim: 'safe'}
+      ]
+
+      /*
+      *
+      */
+      function addOptions() {
+        var ul = document.getElementById("options");
+
+        options.forEach(d => {
+
+            var li = document.createElement("li");
+            li.setAttribute('onclick', `setColumn("${d.dim}")`)
+
+            var radio = document.createElement("input")
+            radio.setAttribute('type', 'radio')
+            radio.setAttribute('name', 'column')
+            radio.setAttribute('id', d.dim)
+
+            var label = document.createElement("label")
+            label.setAttribute('for', d.dim)
+            label.textContent = d.name
+
+            li.appendChild(radio);
+            li.appendChild(label);
+            ul.appendChild(li);
+        })       
+    }
+    addOptions()
+
+      /*
+      * Change style
+      */
+      function setColumn(column) {
+          style.setContent(`
+            #layer {
+                marker-fill: ramp([${column}], (#045275, #058092, #46aea0, #9bd8a4, #f7feae), quantiles);
+                marker-allow-overlap: true;
+                marker-line-color: #D3D3D3;
+                marker-line-opacity: 1;
+
+                [zoom <= 12] { marker-line-width: 0; marker-width: 5; marker-fill-opacity: 0.5;}
+                [zoom > 12] { marker-line-width: 0; marker-width: 8; marker-fill-opacity: 1;}
+                [zoom > 14] { marker-line-width: 0.5; marker-width: 10; marker-fill-opacity: 1;}
+            }
+        `)
+      }
+
+      function addLegend(metadata) {
+
+        if (metadata.styles.length == 0) return;
+
+        buckets = metadata.styles[0]._buckets
+        column = metadata.styles[0]._column
+        min = metadata.styles[0]._min
+        max = metadata.styles[0]._max
+
+        /* Set Legend */
+        var legendbox = document.getElementById("legendbox");
+        legendbox.setAttribute('style', 'display: true;')
+
+        legendbox.getElementsByTagName('h1')[0].textContent = options.filter(d => d.dim == column)[0].name
+        legendbox.getElementsByTagName('li')[0].textContent = Math.round(min*100)/100
+        legendbox.getElementsByTagName('li')[1].textContent = Math.round(max*100)/100
+
+        quartiles = legendbox.getElementsByClassName('quartile')
+
+        buckets.forEach((q, i) => {
+
+            quartiles[i].setAttribute('style', `background-color:${q.value}`)
+        })
+
+        }
+
+      layer.on('metadataChanged', m => addLegend(m))
+
+    </script>
+  </body>
+</html>
