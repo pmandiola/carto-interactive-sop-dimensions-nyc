@@ -23,7 +23,7 @@
         <div id="toolbox" class="toolbox">
             <div class="box">
                 <header>
-                <h1>Select dimension</h1>
+                <h1>Select variable</h1>
                 </header>
                 <section>
                 <p class="description open-sans"></p>
@@ -39,7 +39,7 @@
 
             <div id="legendbox" class="box cartodb-legend choropleth" style="display: none;">
                 <header>
-                <h1>Selected dimension</h1>
+                <h1>Selected variable</h1>
                 </header>
                 <ul style="width: 100%; height: auto">
                     <li class="min"> 170000 </li>
@@ -71,7 +71,7 @@
 
       const client = new carto.Client({ apiKey, username });
 
-      const source = new carto.source.Dataset('intersections_final');
+      const source = new carto.source.Dataset('intersections_final_1');
       const style = new carto.style.CartoCSS(`
         #layer {
           marker-width: 7;
@@ -106,12 +106,10 @@
             ]
           );
           
-          //Also move
+          //Also move so its not behind the sidebar
           var centerPoint = map.getSize().divideBy(2),
           targetPoint = centerPoint.subtract([-150, 0]),
           targetLatLng = map.containerPointToLatLng(targetPoint);
-            console.log(centerPoint)
-            console.log(targetLatLng)
           map.panTo(targetLatLng, {animate: false});
         });
       // From BOX(-179.5 -89.9,179.3 82.3) to bounds object
@@ -127,9 +125,11 @@
       }
 
       options = [
+          { name: 'Collisions', dim: 'collisions'},
           { name: 'Form', dim: 'form3'},
           { name: 'Density', dim: 'dens2'},
           { name: 'Connectivity', dim: 'conn5'},
+          { name: 'Proximity', dim: 'prox3'},
           { name: 'Parks', dim: 'parks2'},
           { name: 'Recreation', dim: 'paf2'},
           { name: 'Pedestrian', dim: 'peds3'},
@@ -137,6 +137,8 @@
           { name: 'Aesthetic', dim: 'aesttot3'},
           { name: 'Safety', dim: 'safe'}
       ]
+
+      options.forEach(d => { if (d.dim != 'collisions') d.dim = d.dim + '_norm' })
 
       /*
       *
